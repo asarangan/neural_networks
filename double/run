@@ -1,0 +1,3 @@
+#!/bin/bash
+
+java -Xmx4g -jar  neural_networks.jar dataSource="MNIST" LR=0.3 MRMax=0.05

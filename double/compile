@@ -1,0 +1,3 @@
+#!/bin/bash
+
+kotlinc neural_networks.kt -include-runtime -d neural_networks.jar
