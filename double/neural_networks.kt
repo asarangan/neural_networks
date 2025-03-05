@@ -131,12 +131,15 @@ class MNIST(imageFile:String, labelFile:String, count:Int){
     	println("Finished Reading x")}
 
     fun showByte(byteNum:Int){
+        var pgm = "P2\n28 28\n255\n"
         yc[byteNum].forEach{v -> val str = "%02X ".format(v.toInt()).takeLast(3); print (str)}; println()   
         xc[byteNum].forEachIndexed{i,v -> 
             val str = "%02X ".format((v*255.0).toInt()).takeLast(3)
             print (str)
-            if ((i+1)%28==0){println()}}
+            pgm += (v*255.0).toInt().toString()+" "
+            if ((i+1)%28==0){println(); pgm += "\n"}}
         println()
+        File("file.pgm").writeText(pgm)
     }
 }
 
@@ -192,7 +195,7 @@ fun main(args: Array<String>) {
         "MNIST" -> {
     		val MNISTTrainData = MNIST("../data/train-images.idx3-ubyte","../data/train-labels.idx1-ubyte", trainDataN)
     		trainingData = MNISTTrainData.xc.zip(MNISTTrainData.yc)
-    		//MNISTTrainData.showByte(1)
+    		MNISTTrainData.showByte(1)
     		}
         else -> {
             val sineTrainData = testData(1.0e-6)
