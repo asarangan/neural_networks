@@ -19,24 +19,36 @@ class Network(I:Int, layers:List<Int>, Rmax:Double, val function:String) {
 	val d:Array<Array<Float>> = layers.map { Array(it) {0.0f} }.toTypedArray()
     val z:Array<Array<Float>> = layers.map { Array(it) {0.0f} }.toTypedArray()
     
-    //Set the activation function as the extension to the Double class. We can add other functions here. Default is the sigmoid. Input is z
-    fun Float.act(type:String) =  when (type) { 	"sigmoid" -> 1.0f/(1.0f+exp(-this)) 
-    												"tanh"	-> tanh(this)
-                                                    "relu"	-> max(0.0f,this)
-        											else -> 1.0f/(1.0f+exp(-this))}
+    //Set the activation function as the extension to the Float class. We can add other functions here. Default is the sigmoid. Input is z
+    fun Array<Float>.act(type:String):Array<Float> {	val s = this.map{exp(it)}.sum()
+    													return map{
+        													when (type) { 	
+        														"sigmoid" -> 1.0f/(1.0f+exp(-it))
+    															"tanh"	-> tanh(it)
+                                                    			"relu"	-> max(0.0f,it)
+                                                        		"softmax" -> exp(it)/s
+        													else -> 1.0f/(1.0f+exp(-it))}}.toTypedArray()}
     
-    //Derivative of the activation function, also set as an extension to the Double class. Default is the sigmoid. Input is z
-    fun Float.dact(type:String) = when (type) {	"sigmoid" -> this.act(type)*(1.0f-this.act(type)) 
-                                                    "tanh"	-> 1.0f - tanh(this).pow(2)
-                                                    "relu"	-> if (this > 0.0f){1.0f} else{0.0f}
-        											else -> this.act(type)*(1.0f-this.act(type))}
+    //Derivative of the activation function, also set as an extension to the Float class, returning a matrix because of the cross terms. 
+    //Default is the sigmoid. Input is z
+    fun Array<Float>.dact(type:String):Array<Array<Float>>{
+        											val a = this.act(type)
+        											val dadz = Array(this.size){Array(this.size){0.0f}}  
+        											when (type) {	
+                                                        "sigmoid" -> 	dadz.forEachIndexed{i,_ -> dadz[i][i] = a[i]*(1.0f-a[i])}
+                                                    	"tanh"	-> dadz.forEachIndexed{i,_ -> dadz[i][i] = 1.0f - a[i].pow(2)}
+                                                    	"relu"	-> dadz.forEachIndexed{i,_ -> if (a[i] > 0.0f){dadz[i][i] = 1.0f} else {dadz[i][i] = 0.0f}}
+                                                        "softmax" -> dadz.forEachIndexed{i,v -> v.forEachIndexed{j,_ -> if (i==j) {v[j] = a[i]*(1.0f-a[i])}
+                                                        																		else{v[j] = -a[j]*a[i]}}}
+        												else -> dadz.forEachIndexed{i,_ -> dadz[i][i] = a[i]*(1.0f-a[i])}}
+                                                    return dadz}
     	
     //Step forward through all layers, saving all the intermediate z and a-vectors
     fun forward(x:Array<Float>){	
         for (l in 0..a.size-1) {
                 a[l].forEachIndexed{i,_ ->
-                        z[l][i] = w[l][i].zip( if (l==0) x else a[l-1] ){j,k -> j*k}.sum()+b[l][i]
-                    	a[l][i] = z[l][i].act(function)}}
+                        z[l][i] = w[l][i].zip( if (l==0) x else a[l-1] ){j,k -> j*k}.sum()+b[l][i]}
+                a[l] = z[l].act(function)}
     }
     
     //Transpose a matrix. It is declared as an extension to the Array<Array<Double>> class.
@@ -68,14 +80,16 @@ class Network(I:Int, layers:List<Int>, Rmax:Double, val function:String) {
         
         //Calculate the last layer delta
         val L = a.size-1
+        var dadz = z[L].dact(function)
         z[L].forEachIndexed{i,z ->
-            d[L][i] = (a[L][i]-y[i]) * z.dact(function)}	//derivative of the cost function is here
+            d[L][i] = (a[L][i]-y[i]) * dadz[i][i]}	//derivative of the cost function is here
         
         //Then calculate the other deltas moving backwards. 
         for (l in a.size-2 downTo 0){
             val wlplus1T = w[l+1].transpose()
+            dadz = z[l].dact(function)
             z[l].forEachIndexed{i,z ->
-                d[l][i] = wlplus1T[i].zip(d[l+1]){j,k -> j*k}.sum() * z.dact(function) }}
+                d[l][i] = wlplus1T[i].zip(d[l+1]){j,k -> j*k}.sum() * dadz[i][i] }}
     }
     
     //Calculate the gradients of the w matrix elements. This keeps cumulating until we reset it.
